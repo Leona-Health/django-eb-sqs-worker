@@ -10,7 +10,7 @@ from eb_sqs_worker import sqs
 logger = logging.getLogger(__name__)
 
 
-def task(function=None, run_locally=None, queue_name=None, task_name=None, delay_seconds=None):
+def task(function=None, run_locally=None, queue_name=None, task_name=None, delay_seconds=None, cron=False):
     """
     Decorate functions with this decorator to automatically register them in AWS_EB_ENABLED_TASKS.
     Don't supply positional arguments, use only keyword arguments, otherwise the decorator will work.
@@ -20,6 +20,7 @@ def task(function=None, run_locally=None, queue_name=None, task_name=None, delay
     :param queue_name:
     :param task_name:
     :param delay_seconds:
+    :param cron:
     :return:
     """
 
@@ -52,6 +53,12 @@ def task(function=None, run_locally=None, queue_name=None, task_name=None, delay
         settings.AWS_EB_ENABLED_TASKS[task_name_to_use] = task_function_execution_path
 
         # prepare the returned function
+
+        # don't trigger periodical task for crons that is disabled
+        # this is useful to make sure cron is only running on staging but not dev
+        if cron and settings.PERIODIC_TASK_DISABLED:
+            logger.info(f"eb-sqs-worker: skipping cron task {task_name_to_use} as periodic task is disabled")
+            return lambda **kwargs: None
 
         # the function is swapped with sqs.send_task task call
         # we do this instead of adding traditional delay function,
